@@ -45,7 +45,7 @@ namespace api
                         }
                         var response = await client.SendAsync(request);
                         if(response.IsSuccessStatusCode) {
-                            await context.Response.WriteAsync($"API (v2) saw this --> {await response.Content.ReadAsStringAsync()}");
+                            await context.Response.WriteAsync($"API saw this --> {await response.Content.ReadAsStringAsync()}");
                         }
                         else {
                             await context.Response.WriteAsync("Couldn't connect...");
