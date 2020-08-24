@@ -1,0 +1,77 @@
+pool:
+  name: Azure Pipelines
+#Your build pipeline references an undefined variable named ‘teamSpaceName’. Create or edit the build pipeline for this YAML file, define the variable on the Variables tab. See https://go.microsoft.com/fwlink/?linkid=865972
+#Your build pipeline references an undefined variable named ‘currentSpaceName’. Create or edit the build pipeline for this YAML file, define the variable on the Variables tab. See https://go.microsoft.com/fwlink/?linkid=865972
+
+steps:
+- bash: |
+   TEAMSPACE="team-space"
+   case "$(Build.SourceBranchName)" in
+    master) SPACENAME=$TEAMSPACE ;;
+    *) SPACENAME="$(System.PullRequest.SourceBranch)" ;;
+   esac
+   
+   REPLACE="refs/heads/"
+   WITH=""
+   SPACENAME="${SPACENAME/$REPLACE/$WITH}" 
+   
+   echo "Based on Branch: $SPACENAME"
+   echo "##vso[task.setvariable variable=currentSpaceName;]$SPACENAME"
+   echo "##vso[task.setvariable variable=teamSpaceName;]$TEAMSPACE"
+   
+   
+  displayName: 'Determine Azds Space'
+
+- task: AzureCLI@2
+  displayName: 'Install AZDS Client tools'
+  inputs:
+    azureSubscription: 'Moim-AzureSubcription-POWER'
+    scriptType: bash
+    scriptPath: 'infrastructure/azds-linux-setup.sh'
+  env:
+    resourceGroup: $(resourceGroup)
+    clusterName: $(clusterName)
+
+- task: AzureCLI@2
+  displayName: 'Select Dev Space'
+  inputs:
+    azureSubscription: 'Moim-AzureSubcription-POWER'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az aks get-credentials -g $resourceGroup -n $clusterName --overwrite-existing
+     
+     EXISTS=$(kubectl get namespace -o=jsonpath='{.items[?(@.metadata.name=="$(currentSpaceName)")].metadata.name}')
+     
+     if [[ "$EXISTS" == "$(currentSpaceName)" ]]; then
+         echo "Name space $(currentSpaceName) already exists."
+     else
+        echo "Create new namespace $(currentSpaceName) child of $(teamSpaceName)"
+        kubectl create namespace $(currentSpaceName)
+        kubectl label --overwrite ns $(currentSpaceName) azds.io/space=true
+        kubectl label --overwrite ns $(currentSpaceName) azds.io/parent-space=$(teamSpaceName)
+     fi
+     
+     azds space select --name $(currentSpaceName) -y
+    workingDirectory: src/api
+  env:
+    resourceGroup: $(resourceGroup)
+    clusterName: $(clusterName)
+    serviceName: backend
+    spaceName: team-space
+
+- task: AzureCLI@2
+  displayName: 'Service Deploy: API'
+  inputs:
+    azureSubscription: 'Moim-AzureSubcription-POWER'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     azds prep --enable-ingress
+     azds up -d
+    workingDirectory: src/api
+  env:
+    resourceGroup: $(resourceGroup)
+    clusterName: $(clusterName)
+    serviceName: api
+    spaceName: team-space
