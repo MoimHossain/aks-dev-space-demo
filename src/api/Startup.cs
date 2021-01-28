@@ -32,20 +32,22 @@ namespace api
             {
                 endpoints.MapGet("/", async context =>
                 {
-
+                    var message = "BETA XX API Saw this -->";
                     try
                     {
                         using var client = new System.Net.Http.HttpClient();
-                        var request = new System.Net.Http.HttpRequestMessage();
-                        request.RequestUri = new Uri("http://backend/");
-                        var header = "azds-route-as";
+                        var request = new System.Net.Http.HttpRequestMessage
+                        {
+                            RequestUri = new Uri("http://backend/")
+                        };
+                        var header = "kubernetes-route-as";
                         if (context.Request.Headers.ContainsKey(header))
                         {
                             request.Headers.Add(header, context.Request.Headers[header] as IEnumerable<string>);
                         }
                         var response = await client.SendAsync(request);
                         if(response.IsSuccessStatusCode) {
-                            await context.Response.WriteAsync($"API saw this --> {await response.Content.ReadAsStringAsync()}");
+                            await context.Response.WriteAsync($"{message} {await response.Content.ReadAsStringAsync()}");
                         }
                         else {
                             await context.Response.WriteAsync("Couldn't connect...");

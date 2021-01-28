@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-pr
+  namespace: b2kapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5 
+  template:
+    metadata:
+      annotations:
+        routing.visualstudio.io/route-on-header: kubernetes-route-as=pr
+      labels:
+        app: api
+        routing.visualstudio.io/route-from: api
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: api
+        image: moimhossain/api:beta1
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 250m
+          limits:
+            cpu: 500m
+      imagePullSecrets:
+      - name: registrycredentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-pr
+  namespace: b2kapp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    app: api
+---
